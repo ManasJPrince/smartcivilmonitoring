@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Urban Sanitation Intelligence System</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f4f6f9;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+
+h1 {
+    text-align: center;
+}
+
+.controls {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+input, select, button {
+    padding: 8px 12px;
+    margin: 5px;
+    font-size: 15px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+button {
+    background: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+button.reset {
+    background: #dc3545;
+}
+
+button.reset:hover {
+    background: #a71d2a;
+}
+
+.kpi-strip {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 10px;
+}
+
+.kpi {
+    flex: 1;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.dashboard {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.card {
+    flex: 1;
+    min-width: 250px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.green { border-left: 6px solid #28a745; }
+.yellow { border-left: 6px solid #ffc107; }
+.red { border-left: 6px solid #dc3545; }
+
+.alert-box {
+    margin-top: 20px;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.log {
+    margin-top: 25px;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Urban Sanitation Intelligence System</h1>
+
+<div class="kpi-strip">
+    <div class="kpi">Total Incidents<br><b id="totalIncidents">0</b></div>
+    <div class="kpi">Active Alerts<br><b id="activeAlerts">0</b></div>
+    <div class="kpi">Critical Zones<br><b id="criticalZones">0</b></div>
+    <div class="kpi">Last Reset<br><b id="lastReset">-</b></div>
+</div>
+
+<div class="controls">
+    Threshold:
+    <input type="number" id="thresholdInput" value="5" min="1">
+    
+    <select id="zoneSelect">
+        <option value="A">Zone A</option>
+        <option value="B">Zone B</option>
+        <option value="C">Zone C</option>
+    </select>
+
+    <button onclick="reportIncident()">Simulate Incident</button>
+    <button class="reset" onclick="resetSystem()">Reset System</button>
+</div>
+
+<div class="dashboard">
+    <div id="zoneA" class="card green">Zone A<br>0 Incidents</div>
+    <div id="zoneB" class="card green">Zone B<br>0 Incidents</div>
+    <div id="zoneC" class="card green">Zone C<br>0 Incidents</div>
+</div>
+
+<div id="alertBox"></div>
+
+<div class="log" id="logBox">
+<b>Activity Log</b><br>
+</div>
+
+</div>
+
+<script>
+
+// ===== CONFIG =====
+const timeWindow = 3 * 60 * 60 * 1000; // 3 hours
+
+// ===== DATA =====
+let events = JSON.parse(localStorage.getItem("events")) || {A:[],B:[],C:[]};
+let alertSent = JSON.parse(localStorage.getItem("alertSent")) || {A:false,B:false,C:false};
+let lastResetTime = localStorage.getItem("lastReset") || "-";
+
+// ===== INIT =====
+document.getElementById("lastReset").innerText = lastResetTime;
+updateUI();
+
+// ===== FUNCTIONS =====
+
+function saveData(){
+    localStorage.setItem("events", JSON.stringify(events));
+    localStorage.setItem("alertSent", JSON.stringify(alertSent));
+}
+
+function reportIncident(){
+
+    let zone = document.getElementById("zoneSelect").value;
+    let threshold = parseInt(document.getElementById("thresholdInput").value);
+    let now = Date.now();
+
+    events[zone].push(now);
+    events[zone] = events[zone].filter(t => now - t <= timeWindow);
+
+    if(events[zone].length >= threshold && !alertSent[zone]){
+        alertSent[zone] = true;
+        showAlert(`⚠ Hotspot Alert in Zone ${zone}`);
+        logActivity(`Zone ${zone} reached threshold.`);
+    }
+
+    updateUI();
+    saveData();
+}
+
+function updateUI(){
+
+    let threshold = parseInt(document.getElementById("thresholdInput").value);
+    let total = 0;
+    let active = 0;
+    let critical = 0;
+
+    for(let zone in events){
+
+        let count = events[zone].length;
+        total += count;
+
+        let div = document.getElementById("zone"+zone);
+        div.innerHTML = `Zone ${zone}<br>${count} Incidents`;
+        div.className = "card";
+
+        if(count >= threshold*2){
+            div.classList.add("red");
+            critical++;
+        }
+        else if(count >= threshold){
+            div.classList.add("yellow");
+            active++;
+        }
+        else{
+            div.classList.add("green");
+        }
+    }
+
+    document.getElementById("totalIncidents").innerText = total;
+    document.getElementById("activeAlerts").innerText = active;
+    document.getElementById("criticalZones").innerText = critical;
+}
+
+function showAlert(message){
+    let box = document.getElementById("alertBox");
+    box.className = "alert-box";
+    box.style.background = "#ffeeba";
+    box.innerHTML = message;
+}
+
+function logActivity(msg){
+    let log = document.getElementById("logBox");
+    log.innerHTML += msg + "<br>";
+}
+
+function generateSummary(){
+    let summary = "📊 3-Hour Summary<br>";
+    for(let zone in events){
+        summary += `Zone ${zone}: ${events[zone].length} incidents<br>`;
+    }
+    return summary;
+}
+
+function autoReset(){
+    logActivity("Auto reset executed.");
+    showAlert(generateSummary());
+
+    events = {A:[],B:[],C:[]};
+    alertSent = {A:false,B:false,C:false};
+
+    lastResetTime = new Date().toLocaleTimeString();
+    localStorage.setItem("lastReset", lastResetTime);
+    document.getElementById("lastReset").innerText = lastResetTime;
+
+    saveData();
+    updateUI();
+}
+
+function resetSystem(){
+    if(!confirm("Are you sure you want to reset the system?")) return;
+    autoReset();
+}
+
+// ===== AUTO RESET TIMER =====
+setInterval(autoReset, timeWindow);
+
+// For demo testing, change above line to:
+// setInterval(autoReset, 60000);
+
+</script>
+
+</body>
+</html>
+
